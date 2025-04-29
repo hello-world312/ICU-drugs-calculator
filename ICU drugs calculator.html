@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICU Drugs Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #333;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .heading-primary {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            display: block;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+        .input-text {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #e2e8f0;
+            font-size: 1rem;
+            color: #333;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .input-text:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.16);
+        }
+        .select-box {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #e2e8f0;
+            font-size: 1rem;
+            color: #333;
+            background-color: #fff;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z' fill='%2394a3b8'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1rem;
+        }
+        .select-box:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.16);
+        }
+        .calculate-button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4299e1;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 0.5rem;
+        }
+        .calculate-button:hover {
+            background-color: #3182ce;
+        }
+        .result-box {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #edf2f7;
+            border-radius: 0.75rem;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .result-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 1rem;
+        }
+        .result-text {
+            font-size: 1.1rem;
+            color: #333;
+            margin-bottom: 0.75rem;
+        }
+        .formula-box {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f7fafc;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .formula-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+        .formula-text {
+            font-size: 1.1rem;
+            color: #333;
+            font-family: monospace;
+        }
+        .dose-box {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f7fafc;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .dose-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+        .dose-text {
+            font-size: 1.1rem;
+            color: #333;
+        }
+        .nav-button {
+            padding: 0.75rem 1.5rem;
+            background-color: #4299e1;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin: 0 0.5rem;
+        }
+        .nav-button:hover {
+            background-color: #3182ce;
+        }
+        #main-menu {
+            display: block;
+        }
+        .calculator-page {
+            display: none;
+        }
+        .calculator-page.active {
+            display: block;
+        }
+        .note-text {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .warning-high {
+            color: red;
+            font-weight: bold;
+        }
+        .warning-low {
+            color: orange;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container">
+        <h1 class="heading-primary">ICU Drugs Calculator</h1>
+        <div id="main-menu">
+            <h2 class="text-2xl font-semibold mb-4 text-center">Select Calculator</h2>
+            <div class="flex justify-center">
+                <button class="nav-button" data-target="noradrenaline-calculator">Noradrenaline Calculator</button>
+                <button class="nav-button" data-target="nitroglycerin-calculator">Nitroglycerin Calculator</button>
+            </div>
+        </div>
+        <div id="noradrenaline-calculator" class="calculator-page">
+            <h2 class="text-xl font-semibold mb-4">Noradrenaline Infusion Rate Calculator</h2>
+            <div class="form-group">
+                <label for="noradrenaline-dose" class="form-label">Desired Dose (mcg/kg/min):</label>
+                <input type="number" id="noradrenaline-dose" value="0.1" step="0.01" min="0" class="input-text">
+            </div>
+            <div class="form-group">
+                <label for="noradrenaline-weight" class="form-label">Weight (kg):</label>
+                <input type="number" id="noradrenaline-weight" placeholder="e.g., 70" class="input-text" required>
+            </div>
+            <div class="form-group">
+                <label for="noradrenaline-concentration" class="form-label">Ampoule Concentration (mg):</label>
+                <select id="noradrenaline-concentration" class="select-box" required>
+                    <option value="" disabled selected>Select Concentration</option>
+                    <option value="4">4 mg</option>
+                    <option value="8">8 mg</option>
+                </select>
+            </div>
+            <button id="calculate-noradrenaline" class="calculate-button">Calculate Infusion Rate</button>
+            <div id="result-noradrenaline" class="result-box" style="display: none;">
+                <h2 class="result-title">Noradrenaline Infusion Rate</h2>
+                <p id="noradrenaline-infusion-rate-text" class="result-text"></p>
+                <p id="noradrenaline-infusion-range-text" class="result-text"></p>
+            </div>
+            <div class="dose-box">
+                <h3 class="dose-title">Noradrenaline Dose</h3>
+                <p class="dose-text">0.1 - 1 mcg/kg/min</p>
+            </div>
+            <div class="formula-box">
+                <h3 class="formula-title">Formula</h3>
+                <p class="formula-text">
+                    Infusion Rate (mL/hr) = (Desired Dose (mcg/kg/min) x 60 x Weight (kg) x 50) / (1000 x Ampoule Concentration (mg))
+                </p>
+            </div>
+            <p class="note-text">
+                Note: This calculator assumes the medication is administered using a 50 ml syringe pump.
+            </p>
+            <button class="nav-button back-button" data-target="main-menu">Back to Menu</button>
+        </div>
+        <div id="nitroglycerin-calculator" class="calculator-page">
+            <h2 class="text-xl font-semibold mb-4">Nitroglycerin Infusion Rate Calculator</h2>
+            <div class="form-group">
+                <label for="nitroglycerin-dose" class="form-label">Desired Dose (mcg/min):</label>
+                <input type="number" id="nitroglycerin-dose" value="5" min="0" class="input-text">
+            </div>
+            <div class="form-group">
+                <label for="nitroglycerin-dilution" class="form-label">GTN Amount Diluted (mg):</label>
+                <input type="number" id="nitroglycerin-dilution" placeholder="e.g., 5" class="input-text" value="5">
+            </div>
+            <button id="calculate-nitroglycerin" class="calculate-button">Calculate Infusion Rate</button>
+            <div id="result-nitroglycerin" class="result-box" style="display: none;">
+                <h2 class="result-title">Nitroglycerin Infusion Rate</h2>
+                <p id="nitroglycerin-infusion-rate-text" class="result-text"></p>
+                <p id="nitroglycerin-infusion-range-text" class="result-text"></p>
+            </div>
+            <div class="dose-box">
+                <h3 class="dose-title">Nitroglycerin Dose</h3>
+                <p class="dose-text">5 - 200 mcg/min</p>
+            </div>
+            <div class="formula-box">
+                <h3 class="formula-title">Formula</h3>
+                <p class="formula-text">
+                    Infusion Rate (mL/hr) = (Desired Dose (mcg/min) x 60 x 50) / (1000 x GTN Amount Diluted (mg))
+                </p>
+            </div>
+            <p class="note-text">
+                Note: This calculator assumes the medication is administered using a 50 ml syringe pump.
+            </p>
+            <button class="nav-button back-button" data-target="main-menu">Back to Menu</button>
+        </div>
+    </div>
+    <script>
+        const mainMenu = document.getElementById('main-menu');
+        const calculatorPages = document.querySelectorAll('.calculator-page');
+        const navButtons = document.querySelectorAll('.nav-button');
+
+        function showPage(targetId) {
+            mainMenu.style.display = targetId === 'main-menu' ? 'block' : 'none';
+            calculatorPages.forEach(page => {
+                page.style.display = page.id === targetId ? 'block' : 'none';
+            });
+        }
+
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const target = button.dataset.target;
+                showPage(target);
+            });
+        });
+
+        // Noradrenaline Calculator
+        const calculateNoradrenalineButton = document.getElementById('calculate-noradrenaline');
+        calculateNoradrenalineButton.addEventListener('click', () => {
+            const dose = parseFloat(document.getElementById('noradrenaline-dose').value) || 0.1;
+            const weight = parseFloat(document.getElementById('noradrenaline-weight').value);
+            const concentration = parseFloat(document.getElementById('noradrenaline-concentration').value);
+            
+            if (isNaN(weight) || weight <= 0) {
+                alert("Please enter a valid weight (positive number)");
+                return;
+            }
+            if (isNaN(concentration) || concentration <= 0) {
+                alert("Please select a valid concentration");
+                return;
+            }
+            
+            const infusionRate = (dose * 60 * weight * 50) / (1000 * concentration);
+            const minRate = (0.1 * 60 * weight * 50) / (1000 * concentration);
+            const maxRate = (1 * 60 * weight * 50) / (1000 * concentration);
+            
+            document.getElementById('noradrenaline-infusion-rate-text').textContent = `${infusionRate.toFixed(2)} mL/hr`;
+            
+            let rangeText = `Infusion Rate Range: ${minRate.toFixed(2)} - ${maxRate.toFixed(2)} mL/hr`;
+            if (dose > 1) {
+                rangeText += `<br><span class="warning-high">WARNING: VERY HIGH RATE (Above maximum recommended dose)</span>`;
+            } else if (dose < 0.1) {
+                rangeText += `<br><span class="warning-low">WARNING: VERY LOW RATE (Below minimum recommended dose)</span>`;
+            }
+            
+            document.getElementById('noradrenaline-infusion-range-text').innerHTML = rangeText;
+            document.getElementById('result-noradrenaline').style.display = 'block';
+        });
+
+        // Nitroglycerin Calculator
+        const calculateNitroglycerinButton = document.getElementById('calculate-nitroglycerin');
+        calculateNitroglycerinButton.addEventListener('click', () => {
+            const dose = parseFloat(document.getElementById('nitroglycerin-dose').value) || 5;
+            const dilution = parseFloat(document.getElementById('nitroglycerin-dilution').value) || 5;
+            
+            const infusionRate = (dose * 60 * 50) / (1000 * dilution);
+            const minRate = (5 * 60 * 50) / (1000 * dilution);
+            const maxRate = (200 * 60 * 50) / (1000 * dilution);
+            
+            document.getElementById('nitroglycerin-infusion-rate-text').textContent = `${infusionRate.toFixed(2)} mL/hr`;
+            
+            let rangeText = `Infusion Rate Range: ${minRate.toFixed(2)} - ${maxRate.toFixed(2)} mL/hr`;
+            if (dose > 200) {
+                rangeText += `<br><span class="warning-high">WARNING: VERY HIGH RATE (Above maximum recommended dose)</span>`;
+            } else if (dose < 5) {
+                rangeText += `<br><span class="warning-low">WARNING: VERY LOW RATE (Below minimum recommended dose)</span>`;
+            }
+            
+            document.getElementById('nitroglycerin-infusion-range-text').innerHTML = rangeText;
+            document.getElementById('result-nitroglycerin').style.display = 'block';
+        });
+
+        // Back buttons
+        document.querySelectorAll('.back-button').forEach(button => {
+            button.addEventListener('click', () => {
+                showPage('main-menu');
+            });
+        });
+
+        // Initialize
+        showPage('main-menu');
+    </script>
+</body>
+</html>
