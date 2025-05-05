@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICU DoseCalc</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Tailwind gray-50 */
+        }
+        /* Style for required fields */
+        .required-label::after {
+            content: '*';
+            color: red;
+            margin-left: 2px;
+        }
+        /* Style for info modal */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            padding-top: 60px; /* Location of the box */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto; /* 5% from the top and centered */
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%; /* Could be more or less, depending on screen size */
+            max-width: 500px;
+            border-radius: 0.5rem; /* Rounded corners */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* Highlight for out-of-range dose */
+        .warning-highlight {
+            border-color: #facc15; /* Tailwind yellow-400 */
+            background-color: #fef9c3; /* Tailwind yellow-100 */
+            color: #ca8a04; /* Tailwind yellow-600 */
+        }
+        .warning-text {
+            color: #ca8a04; /* Tailwind yellow-600 */
+            font-weight: 500;
+        }
+        /* Highlight for non-standard concentration */
+        .concentration-warning-text {
+            color: #fb923c; /* Tailwind orange-400 */
+            font-weight: 500;
+        }
+        /* Tooltip style */
+        .tooltip {
+          position: relative;
+          display: inline-block;
+          cursor: pointer;
+        }
+
+        .tooltip .tooltiptext {
+          visibility: hidden;
+          width: 200px;
+          background-color: #555;
+          color: #fff;
+          text-align: center;
+          border-radius: 6px;
+          padding: 5px 10px;
+          position: absolute;
+          z-index: 1;
+          bottom: 125%; /* Position the tooltip above the text */
+          left: 50%;
+          margin-left: -100px; /* Use half of the width to center the tooltip */
+          opacity: 0;
+          transition: opacity 0.3s;
+          font-size: 0.875rem; /* text-sm */
+          font-weight: normal;
+        }
+
+        .tooltip .tooltiptext::after {
+          content: "";
+          position: absolute;
+          top: 100%; /* At the bottom of the tooltip */
+          left: 50%;
+          margin-left: -5px;
+          border-width: 5px;
+          border-style: solid;
+          border-color: #555 transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltiptext {
+          visibility: visible;
+          opacity: 1;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-md">
+        <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">
+            ICU DoseCalc
+        </h1>
+
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded" role="alert">
+            <p class="font-bold">Disclaimer</p>
+            <p>This tool is intended as an educational aid and does not substitute for clinical judgment. Verify all calculations and drug information independently before administration. Final verification is required by a qualified healthcare professional.</p>
+        </div>
+
+        <form id="calculator-form" class="space-y-4">
+
+            <div>
+                <label for="drug" class="block text-sm font-medium text-gray-700 required-label">Select Drug</label>
+                <div class="flex items-center mt-1">
+                    <select id="drug" name="drug" class="block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="" disabled selected>-- Select a Drug --</option>
+                        </select>
+                    <button type="button" id="info-button" class="ml-2 p-2 text-gray-500 hover:text-indigo-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fas fa-info-circle fa-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="weight-input-container">
+                <label for="weight" class="block text-sm font-medium text-gray-700 required-label">Patient Weight (kg)</label>
+                <input type="number" id="weight" name="weight" step="0.1" min="0" placeholder="e.g., 70" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="dose" class="block text-sm font-medium text-gray-700 required-label">Desired Dose</label>
+                <div class="flex items-center mt-1">
+                    <input type="number" id="dose" name="dose" step="any" min="0" placeholder="Enter dose value" class="block w-full p-2 border border-gray-300 rounded-l-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <span id="dose-unit" class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-100 text-gray-600 rounded-r-md sm:text-sm">Unit</span>
+                </div>
+                <p id="dose-range-warning" class="mt-1 text-xs warning-text hidden"></p>
+            </div>
+
+            <div>
+                <label for="syringe-volume" class="block text-sm font-medium text-gray-700">
+                    Syringe Volume (ml)
+                    <span class="tooltip">
+                        <i class="fas fa-question-circle text-gray-400 ml-1"></i>
+                        <span class="tooltiptext">Total volume in the syringe pump (usually 50ml).</span>
+                    </span>
+                </label>
+                <input type="number" id="syringe-volume" name="syringe-volume" value="50" step="1" min="1" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="concentration" class="block text-sm font-medium text-gray-700 required-label">
+                    Total Drug in Syringe
+                    <span class="tooltip">
+                        <i class="fas fa-question-circle text-gray-400 ml-1"></i>
+                        <span class="tooltiptext">Total amount (mg or units) of the drug added to the final syringe volume.</span>
+                    </span>
+                </label>
+                 <div class="flex items-center mt-1">
+                    <input type="number" id="concentration" name="concentration" step="any" min="0" placeholder="e.g., 4" class="block w-full p-2 border border-gray-300 rounded-l-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <span id="concentration-unit" class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-100 text-gray-600 rounded-r-md sm:text-sm">Unit</span>
+                </div>
+                 <p id="concentration-warning" class="mt-1 text-xs concentration-warning-text hidden"></p>
+            </div>
+
+            <div class="flex justify-center pt-4">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                    Calculate Rate
+                </button>
+                 <button type="button" id="reset-button" class="ml-4 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-md shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition duration-150 ease-in-out">
+                    Reset
+                </button>
+            </div>
+
+        </form>
+
+        <div id="results-area" class="mt-8 p-4 border border-gray-200 rounded-md bg-gray-50 hidden">
+            <h2 class="text-lg font-semibold text-gray-800 mb-3">Calculation Results</h2>
+            <div class="space-y-2">
+                <p class="text-gray-700">
+                    <strong>Infusion Rate:</strong>
+                    <span id="infusion-rate" class="text-xl font-bold text-indigo-600 ml-2">-- ml/hr</span>
+                </p>
+                <p class="text-sm text-gray-600">
+                    <strong>Formula Used:</strong>
+                    <code id="formula-display" class="block mt-1 p-2 bg-gray-100 rounded text-xs break-words">--</code>
+                </p>
+                 <p id="result-concentration-info" class="text-sm text-gray-600">
+                    Based on <span id="result-conc-value">--</span> in <span id="result-vol-value">--</span> ml.
+                </p>
+                <p id="final-dose-warning" class="mt-1 text-sm warning-text hidden"></p>
+                <p id="final-concentration-warning" class="mt-1 text-sm concentration-warning-text hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-modal-button">&times;</span>
+            <h2 id="modal-drug-name" class="text-xl font-bold text-gray-800 mb-4">Drug Information</h2>
+            <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>Standard Concentration (Egypt):</strong> <span id="modal-concentration">--</span></p>
+                <p><strong>Standard Formulation:</strong> <span id="modal-formulation">--</span></p>
+                <p><strong>Standard Dosing Range:</strong> <span id="modal-dose-range">--</span></p>
+                <p><strong>Common Brands (Egypt):</strong> <span id="modal-brands">--</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Drug Data Store ---
+        // Stores information about each supported drug based on Egyptian market standards.
+        const drugs = {
+            norepinephrine: {
+                name: "Norepinephrine (Noradrenaline)",
+                concentrationAmpoule: 1, // mg/mL
+                volumeAmpoule: 4, // mL
+                defaultTotalDrugInSyringe: 4, // Standard: 1 ampoule (4mg) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'mg', // Unit of the drug itself
+                doseUnit: 'mcg/kg/min',
+                doseRange: [0.05, 0.5],
+                isWeightBased: true,
+                formulation: "4 mg/4 mL ampoule for IV infusion",
+                brands: "Noradrenaline, Levophed",
+                // Formula: (Dose [mcg/kg/min] * Weight [kg] * 60 [min/hr] * Dilution Volume [ml]) / (Total Drug in Syringe [mg] * 1000 [mcg/mg])
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * weight * 60 * dilutionVol) / (totalDrug * 1000),
+                formulaText: "(Dose [mcg/kg/min] × Weight [kg] × 60 × Syringe Volume [ml]) / (Total Drug in Syringe [mg] × 1000)"
+            },
+            epinephrine: {
+                name: "Epinephrine (Adrenaline)",
+                concentrationAmpoule: 1, // mg/mL (using 1:1000 as primary)
+                volumeAmpoule: 1, // mL
+                defaultTotalDrugInSyringe: 1, // Standard: 1 ampoule (1mg) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'mg',
+                doseUnit: 'mcg/kg/min',
+                doseRange: [0.01, 0.1], // Per PRD, though often higher in practice
+                isWeightBased: true,
+                formulation: "1 mg/mL (1:1000) ampoule or pre-filled syringe",
+                brands: "Adrenaline 1:1000 INJ, Dilute Adrenaline 1:10,000 (check dilution)",
+                 // Formula: (Dose [mcg/kg/min] * Weight [kg] * 60 [min/hr] * Dilution Volume [ml]) / (Total Drug in Syringe [mg] * 1000 [mcg/mg])
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * weight * 60 * dilutionVol) / (totalDrug * 1000),
+                formulaText: "(Dose [mcg/kg/min] × Weight [kg] × 60 × Syringe Volume [ml]) / (Total Drug in Syringe [mg] × 1000)"
+            },
+            dopamine: {
+                name: "Dopamine",
+                concentrationAmpoule: 40, // mg/mL
+                volumeAmpoule: 5, // mL
+                defaultTotalDrugInSyringe: 200, // Standard: 1 ampoule (200mg) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'mg',
+                doseUnit: 'mcg/kg/min',
+                doseRange: [2, 20],
+                isWeightBased: true,
+                formulation: "200 mg/5 mL ampoule (concentrate for IV infusion)",
+                brands: "Dopamine Fresenius",
+                 // Formula: (Dose [mcg/kg/min] * Weight [kg] * 60 [min/hr] * Dilution Volume [ml]) / (Total Drug in Syringe [mg] * 1000 [mcg/mg])
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * weight * 60 * dilutionVol) / (totalDrug * 1000),
+                formulaText: "(Dose [mcg/kg/min] × Weight [kg] × 60 × Syringe Volume [ml]) / (Total Drug in Syringe [mg] × 1000)"
+            },
+            dobutamine: {
+                name: "Dobutamine",
+                concentrationAmpoule: 12.5, // mg/mL
+                volumeAmpoule: 20, // mL
+                defaultTotalDrugInSyringe: 250, // Standard: 1 ampoule (250mg) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'mg',
+                doseUnit: 'mcg/kg/min',
+                doseRange: [2, 20],
+                isWeightBased: true,
+                formulation: "250 mg/20 mL ampoule or 250 mg/vial for IV infusion",
+                brands: "Dobutamine HCl, Dobutrex",
+                 // Formula: (Dose [mcg/kg/min] * Weight [kg] * 60 [min/hr] * Dilution Volume [ml]) / (Total Drug in Syringe [mg] * 1000 [mcg/mg])
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * weight * 60 * dilutionVol) / (totalDrug * 1000),
+                formulaText: "(Dose [mcg/kg/min] × Weight [kg] × 60 × Syringe Volume [ml]) / (Total Drug in Syringe [mg] × 1000)"
+            },
+            vasopressin: {
+                name: "Vasopressin",
+                concentrationAmpoule: 20, // units/mL
+                volumeAmpoule: 1, // mL
+                defaultTotalDrugInSyringe: 20, // Standard: 1 ampoule (20 units) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'units',
+                doseUnit: 'units/min',
+                doseRange: [0.01, 0.04],
+                isWeightBased: false,
+                formulation: "20 units/mL in 1 mL ampoule for IV infusion",
+                brands: "Vasopressin Injection",
+                // Formula: (Dose [units/min] * 60 [min/hr] * Dilution Volume [ml]) / Total Drug in Syringe [units]
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * 60 * dilutionVol) / totalDrug, // Weight is not used but passed for consistency
+                formulaText: "(Dose [units/min] × 60 × Syringe Volume [ml]) / Total Drug in Syringe [units]"
+            },
+            milrinone: {
+                name: "Milrinone",
+                concentrationAmpoule: 1, // mg/mL
+                volumeAmpoule: 10, // mL
+                defaultTotalDrugInSyringe: 10, // Standard: 1 ampoule (10mg) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'mg',
+                doseUnit: 'mcg/kg/min',
+                doseRange: [0.25, 0.75],
+                isWeightBased: true,
+                formulation: "1 mg/mL in 10 mL ampoule (10 mg total) for IV infusion",
+                brands: "Milrinone Lactate Injection",
+                 // Formula: (Dose [mcg/kg/min] * Weight [kg] * 60 [min/hr] * Dilution Volume [ml]) / (Total Drug in Syringe [mg] * 1000 [mcg/mg])
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * weight * 60 * dilutionVol) / (totalDrug * 1000),
+                formulaText: "(Dose [mcg/kg/min] × Weight [kg] × 60 × Syringe Volume [ml]) / (Total Drug in Syringe [mg] × 1000)"
+            },
+            nitroglycerin: {
+                name: "Nitroglycerin (GTN)",
+                concentrationAmpoule: 1, // mg/mL (assuming 50mg/50mL vial)
+                volumeAmpoule: 50, // mL
+                defaultTotalDrugInSyringe: 50, // Standard: 1 ampoule/vial (50mg) in 50ml
+                defaultSyringeVolume: 50, // ml
+                drugUnit: 'mg',
+                doseUnit: 'mcg/min',
+                doseRange: [5, 200],
+                isWeightBased: false,
+                formulation: "1 mg/mL in 50 mL ampoule/vial (50 mg total) for IV infusion",
+                brands: "Nitronal, Tridil",
+                // Formula: (Dose [mcg/min] * 60 [min/hr] * Dilution Volume [ml]) / (Total Drug in Syringe [mg] * 1000 [mcg/mg])
+                calculateRate: (dose, weight, totalDrug, dilutionVol) => (dose * 60 * dilutionVol) / (totalDrug * 1000), // Weight is not used
+                formulaText: "(Dose [mcg/min] × 60 × Syringe Volume [ml]) / (Total Drug in Syringe [mg] × 1000)"
+            }
+        };
+
+        // --- DOM Elements ---
+        const drugSelect = document.getElementById('drug');
+        const weightInput = document.getElementById('weight');
+        const weightContainer = document.getElementById('weight-input-container');
+        const doseInput = document.getElementById('dose');
+        const doseUnitSpan = document.getElementById('dose-unit');
+        const doseRangeWarning = document.getElementById('dose-range-warning');
+        const syringeVolumeInput = document.getElementById('syringe-volume');
+        const concentrationInput = document.getElementById('concentration');
+        const concentrationUnitSpan = document.getElementById('concentration-unit');
+        const concentrationWarning = document.getElementById('concentration-warning');
+        const infoButton = document.getElementById('info-button');
+        const calculatorForm = document.getElementById('calculator-form');
+        const resultsArea = document.getElementById('results-area');
+        const infusionRateSpan = document.getElementById('infusion-rate');
+        const formulaDisplay = document.getElementById('formula-display');
+        const resultConcValueSpan = document.getElementById('result-conc-value');
+        const resultVolValueSpan = document.getElementById('result-vol-value');
+        const finalDoseWarning = document.getElementById('final-dose-warning');
+        const finalConcentrationWarning = document.getElementById('final-concentration-warning');
+        const resetButton = document.getElementById('reset-button');
+
+        // --- Modal Elements ---
+        const infoModal = document.getElementById('info-modal');
+        const closeModalButton = document.getElementById('close-modal-button');
+        const modalDrugName = document.getElementById('modal-drug-name');
+        const modalConcentration = document.getElementById('modal-concentration');
+        const modalFormulation = document.getElementById('modal-formulation');
+        const modalDoseRange = document.getElementById('modal-dose-range');
+        const modalBrands = document.getElementById('modal-brands');
+
+        // --- Functions ---
+
+        // Populate drug dropdown options
+        function populateDrugOptions() {
+            // Clear existing options first (important if called multiple times)
+            drugSelect.innerHTML = '<option value="" disabled selected>-- Select a Drug --</option>';
+            for (const key in drugs) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = drugs[key].name;
+                drugSelect.appendChild(option);
+            }
+        }
+
+        // Update UI based on selected drug
+        function updateUIForDrug() {
+            const selectedDrugKey = drugSelect.value;
+            clearWarningsAndResults(); // Clear previous state
+
+            if (!selectedDrugKey) {
+                // Reset if no drug is selected
+                weightContainer.style.display = 'block'; // Show weight by default
+                weightInput.required = true;
+                doseUnitSpan.textContent = 'Unit';
+                concentrationUnitSpan.textContent = 'Unit';
+                concentrationInput.value = '';
+                syringeVolumeInput.value = '50'; // Reset volume
+                doseInput.value = '';
+                weightInput.value = '';
+                infoButton.disabled = true;
+                concentrationInput.placeholder = 'e.g., 4';
+                doseInput.placeholder = 'Enter dose value';
+                 // Ensure weight label is marked as required if visible
+                if (weightContainer.style.display !== 'none') {
+                    weightInput.parentElement.querySelector('label').classList.add('required-label');
+                }
+                return;
+            }
+
+            const drug = drugs[selectedDrugKey];
+
+            // Update dose unit
+            doseUnitSpan.textContent = drug.doseUnit;
+            doseInput.placeholder = `e.g., ${drug.doseRange[0]}`; // Suggest starting dose
+
+            // Update concentration unit and default value
+            concentrationUnitSpan.textContent = drug.drugUnit;
+            concentrationInput.value = drug.defaultTotalDrugInSyringe;
+            concentrationInput.placeholder = `Standard: ${drug.defaultTotalDrugInSyringe}`;
+
+            // Update syringe volume default
+            syringeVolumeInput.value = drug.defaultSyringeVolume;
+
+            // Show/hide weight input and set required status
+            if (drug.isWeightBased) {
+                weightContainer.style.display = 'block';
+                weightInput.required = true;
+                weightInput.parentElement.querySelector('label').classList.add('required-label');
+            } else {
+                weightContainer.style.display = 'none';
+                weightInput.required = false;
+                weightInput.value = ''; // Clear weight if not needed
+                weightInput.parentElement.querySelector('label').classList.remove('required-label');
+            }
+
+            // Enable info button
+            infoButton.disabled = false;
+
+            // Check concentration immediately
+            checkConcentrationStandard();
+            // Check dose range immediately if dose has a value
+            checkDoseRange();
+        }
+
+        // Check if the entered dose is within the standard range
+        function checkDoseRange() {
+            const selectedDrugKey = drugSelect.value;
+            const doseValue = parseFloat(doseInput.value);
+
+            doseRangeWarning.classList.add('hidden'); // Hide warning initially
+            doseInput.classList.remove('warning-highlight');
+
+            if (!selectedDrugKey || isNaN(doseValue) || doseValue <= 0) {
+                 // If dose is cleared or invalid, remove warning but don't return yet,
+                 // allow concentration check to proceed if needed.
+                 // Only return if no drug is selected.
+                 if (!selectedDrugKey) return;
+            } else {
+                 // Only check range if we have a valid positive dose value
+                 const drug = drugs[selectedDrugKey];
+                 const [minDose, maxDose] = drug.doseRange;
+
+                 if (doseValue < minDose || doseValue > maxDose) {
+                     doseRangeWarning.textContent = `Warning: Dose is outside the standard range (${minDose} - ${maxDose} ${drug.doseUnit}).`;
+                     doseRangeWarning.classList.remove('hidden');
+                     doseInput.classList.add('warning-highlight');
+                 }
+            }
+        }
+
+         // Check if the entered concentration matches the standard for the selected drug
+        function checkConcentrationStandard() {
+            const selectedDrugKey = drugSelect.value;
+            const concentrationValue = parseFloat(concentrationInput.value);
+            const volumeValue = parseFloat(syringeVolumeInput.value);
+
+
+            concentrationWarning.classList.add('hidden'); // Hide warning initially
+            // concentrationInput.classList.remove('warning-highlight'); // Decide if concentration input needs highlighting
+
+            if (!selectedDrugKey || isNaN(concentrationValue) || isNaN(volumeValue) || concentrationValue <= 0 || volumeValue <= 0) {
+                 // If concentration/volume is cleared or invalid, remove warning.
+                 // Only return if no drug is selected.
+                 if (!selectedDrugKey) return;
+            } else {
+                // Only check standard if we have valid positive concentration and volume
+                const drug = drugs[selectedDrugKey];
+                // Check if the entered total drug and volume match the standard dilution
+                if (concentrationValue !== drug.defaultTotalDrugInSyringe || volumeValue !== drug.defaultSyringeVolume) {
+                    concentrationWarning.textContent = `Note: Concentration (${concentrationValue} ${drug.drugUnit} in ${volumeValue} ml) differs from standard (${drug.defaultTotalDrugInSyringe} ${drug.drugUnit} in ${drug.defaultSyringeVolume} ml). Ensure this is intended.`;
+                    concentrationWarning.classList.remove('hidden');
+                     // concentrationInput.classList.add('warning-highlight'); // Optional: highlight input
+                }
+            }
+        }
+
+
+        // Calculate the infusion rate
+        function calculateInfusionRate(event) {
+            event.preventDefault(); // Prevent form submission
+
+            // --- Input Validation ---
+            const selectedDrugKey = drugSelect.value;
+            if (!selectedDrugKey) {
+                // Use a less intrusive way than alert, maybe highlight the dropdown?
+                drugSelect.focus();
+                // Consider adding a temporary visual cue like a border color change
+                console.error("No drug selected."); // Log error for debugging
+                return;
+            }
+
+            const drug = drugs[selectedDrugKey];
+            const weightValue = parseFloat(weightInput.value);
+            const doseValue = parseFloat(doseInput.value);
+            const syringeVolumeValue = parseFloat(syringeVolumeInput.value);
+            const concentrationValue = parseFloat(concentrationInput.value);
+
+            let isValid = true; // Flag to track validity
+
+            // Clear previous highlights/errors before re-validating
+            weightInput.classList.remove('border-red-500');
+            doseInput.classList.remove('border-red-500');
+            syringeVolumeInput.classList.remove('border-red-500');
+            concentrationInput.classList.remove('border-red-500');
+
+
+            // Validate required fields
+            if (drug.isWeightBased && (isNaN(weightValue) || weightValue <= 0)) {
+                weightInput.classList.add('border-red-500'); // Highlight invalid input
+                isValid = false;
+            }
+             if (isNaN(doseValue) || doseValue <= 0) {
+                doseInput.classList.add('border-red-500');
+                isValid = false;
+            }
+             if (isNaN(syringeVolumeValue) || syringeVolumeValue <= 0) {
+                syringeVolumeInput.classList.add('border-red-500');
+                isValid = false;
+            }
+             if (isNaN(concentrationValue) || concentrationValue <= 0) {
+                concentrationInput.classList.add('border-red-500');
+                isValid = false;
+            }
+
+            if (!isValid) {
+                // If any input is invalid, show a general message or focus the first invalid field
+                // alert("Please correct the highlighted fields."); // Avoid alerts
+                console.error("Invalid inputs detected.");
+                 // Focus the first invalid field found (optional)
+                 if (drug.isWeightBased && (isNaN(weightValue) || weightValue <= 0)) weightInput.focus();
+                 else if (isNaN(doseValue) || doseValue <= 0) doseInput.focus();
+                 else if (isNaN(syringeVolumeValue) || syringeVolumeValue <= 0) syringeVolumeInput.focus();
+                 else if (isNaN(concentrationValue) || concentrationValue <= 0) concentrationInput.focus();
+
+                // Hide results area if previously shown with invalid calculation
+                resultsArea.classList.add('hidden');
+                return; // Stop calculation
+            }
+
+            // --- Calculation ---
+            const weightForCalc = drug.isWeightBased ? weightValue : 1; // Use 1 if not weight based
+            const rate = drug.calculateRate(doseValue, weightForCalc, concentrationValue, syringeVolumeValue);
+
+            if (isNaN(rate) || !isFinite(rate)) {
+                 // This case should ideally be prevented by input validation, but good to have a fallback
+                 console.error("Calculation resulted in an invalid number. Inputs:", {doseValue, weightForCalc, concentrationValue, syringeVolumeValue});
+                 clearWarningsAndResults();
+                 resultsArea.classList.add('hidden');
+                 // Maybe show an error message in the results area itself
+                 infusionRateSpan.textContent = 'Error';
+                 formulaDisplay.textContent = 'Invalid calculation';
+                 resultsArea.classList.remove('hidden');
+                 return;
+            }
+
+            // --- Display Results ---
+            infusionRateSpan.textContent = `${rate.toFixed(2)} ml/hr`; // Display rate rounded to 2 decimal places
+            formulaDisplay.textContent = drug.formulaText;
+            resultConcValueSpan.textContent = `${concentrationValue} ${drug.drugUnit}`;
+            resultVolValueSpan.textContent = syringeVolumeValue;
+
+            // --- Display Warnings in Results Area (based on checks already performed by input listeners) ---
+            // Dose Warning (re-check logic for safety, though checkDoseRange should handle it)
+            const [minDose, maxDose] = drug.doseRange;
+            if (doseValue < minDose || doseValue > maxDose) {
+                finalDoseWarning.textContent = `Warning: Calculated dose (${doseValue} ${drug.doseUnit}) is outside standard range (${minDose} - ${maxDose} ${drug.doseUnit}).`;
+                finalDoseWarning.classList.remove('hidden');
+            } else {
+                finalDoseWarning.classList.add('hidden');
+            }
+
+            // Concentration Warning (re-check logic)
+            if (concentrationValue !== drug.defaultTotalDrugInSyringe || syringeVolumeValue !== drug.defaultSyringeVolume) {
+                 finalConcentrationWarning.textContent = `Note: Calculation based on non-standard concentration (${concentrationValue} ${drug.drugUnit} in ${syringeVolumeValue} ml). Standard is ${drug.defaultTotalDrugInSyringe} ${drug.drugUnit} in ${drug.defaultSyringeVolume} ml.`;
+                 finalConcentrationWarning.classList.remove('hidden');
+            } else {
+                 finalConcentrationWarning.classList.add('hidden');
+            }
+
+
+            resultsArea.classList.remove('hidden'); // Show results
+        }
+
+        // Show the drug information modal
+        function showInfoModal() {
+            const selectedDrugKey = drugSelect.value;
+            if (!selectedDrugKey) return;
+
+            const drug = drugs[selectedDrugKey];
+
+            modalDrugName.textContent = drug.name;
+            // Display standard concentration (ampoule) and common dilution
+            modalConcentration.textContent = `${drug.concentrationAmpoule} ${drug.drugUnit}/${drug.volumeAmpoule}mL ampoule. Standard dilution: ${drug.defaultTotalDrugInSyringe} ${drug.drugUnit} in ${drug.defaultSyringeVolume}ml.`;
+            modalFormulation.textContent = drug.formulation;
+            modalDoseRange.textContent = `${drug.doseRange[0]} - ${drug.doseRange[1]} ${drug.doseUnit}`;
+            modalBrands.textContent = drug.brands;
+
+            infoModal.style.display = 'block';
+        }
+
+        // Hide the drug information modal
+        function hideInfoModal() {
+            infoModal.style.display = 'none';
+        }
+
+         // Clear warnings and results display
+        function clearWarningsAndResults() {
+            // Input warnings & highlights
+            doseRangeWarning.classList.add('hidden');
+            concentrationWarning.classList.add('hidden');
+            doseInput.classList.remove('warning-highlight', 'border-red-500');
+            concentrationInput.classList.remove('warning-highlight', 'border-red-500'); // Assuming no concentration highlight for now
+            weightInput.classList.remove('border-red-500');
+            syringeVolumeInput.classList.remove('border-red-500');
+
+
+            // Result area
+            resultsArea.classList.add('hidden');
+            infusionRateSpan.textContent = '-- ml/hr';
+            formulaDisplay.textContent = '--';
+            resultConcValueSpan.textContent = '--';
+            resultVolValueSpan.textContent = '--';
+            finalDoseWarning.classList.add('hidden');
+            finalConcentrationWarning.classList.add('hidden');
+        }
+
+        // Reset the form to its initial state
+        function resetForm() {
+            calculatorForm.reset(); // Resets form elements to default values
+            drugSelect.value = ''; // Ensure dropdown is reset
+            updateUIForDrug(); // Update UI based on the reset state (no drug selected)
+            clearWarningsAndResults(); // Clear any displayed warnings or results
+        }
+
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            populateDrugOptions();
+            updateUIForDrug(); // Initial UI setup to handle the "-- Select a Drug --" state correctly
+        });
+
+        drugSelect.addEventListener('change', updateUIForDrug);
+        // Use 'input' for immediate feedback as user types/changes values
+        doseInput.addEventListener('input', checkDoseRange);
+        concentrationInput.addEventListener('input', checkConcentrationStandard);
+        syringeVolumeInput.addEventListener('input', checkConcentrationStandard); // Check standard conc when volume changes too
+        // Add input listeners to clear validation errors as user corrects them
+        weightInput.addEventListener('input', () => weightInput.classList.remove('border-red-500'));
+        doseInput.addEventListener('input', () => doseInput.classList.remove('border-red-500'));
+        syringeVolumeInput.addEventListener('input', () => syringeVolumeInput.classList.remove('border-red-500'));
+        concentrationInput.addEventListener('input', () => concentrationInput.classList.remove('border-red-500'));
+
+
+        calculatorForm.addEventListener('submit', calculateInfusionRate);
+        resetButton.addEventListener('click', resetForm);
+
+        // Modal listeners
+        infoButton.addEventListener('click', showInfoModal);
+        closeModalButton.addEventListener('click', hideInfoModal);
+        // Close modal if clicked outside the content
+        window.addEventListener('click', (event) => {
+            if (event.target == infoModal) {
+                hideInfoModal();
+            }
+        });
+
+    </script>
+
+</body>
+</html>
